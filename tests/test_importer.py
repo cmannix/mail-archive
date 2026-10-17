@@ -7,8 +7,9 @@ import pytest
 from mail_archive.importer import LABEL_HEADERS, Archive, run
 
 
-def message(msgid, subject, labels=None):
-    text = f"From: a@example.com\nTo: me@example.com\nSubject: {subject}\n"
+def message(msgid, subject, labels=None, delivered=()):
+    text = "".join(f"Delivered-To: {d}\n" for d in delivered)
+    text += f"From: a@example.com\nTo: me@example.com\nSubject: {subject}\n"
     if msgid is not None:
         text += f"Message-ID: {msgid}\n"
     if labels:
@@ -116,3 +117,14 @@ def test_tags_are_rebuilt_from_sources_after_losing_the_index(archive):
     run(archive)
 
     assert tags("id:one@x") == ["label/receipts", "source/personal"]
+
+
+def test_tags_every_delivered_to_address(archive):
+    forwarded = message("<fwd@x>", "forwarded", delivered=["Second@example.com", "first+old@example.com"])
+    write_mbox(archive.incoming / "work" / "work.mbox", [forwarded, message("<direct@x>", "direct")])
+
+    run(archive)
+
+    assert tags("id:fwd@x") == ["delivered/first+old@example.com", "delivered/second@example.com", "source/work"]
+    assert notmuch("count", "tag:delivered/first+old@example.com") == ["1"]
+    assert tags("id:direct@x") == ["source/work"]
