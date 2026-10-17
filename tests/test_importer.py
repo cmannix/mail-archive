@@ -4,7 +4,7 @@ import zipfile
 
 import pytest
 
-from mail_archive.importer import Archive, run
+from mail_archive.importer import LABEL_HEADERS, Archive, run
 
 
 def message(msgid, subject, labels=None):
@@ -12,7 +12,7 @@ def message(msgid, subject, labels=None):
     if msgid is not None:
         text += f"Message-ID: {msgid}\n"
     if labels:
-        text += f"X-Gmail-Labels: {labels}\n"
+        text += f"{LABEL_HEADERS[0]}: {labels}\n"
     return text + f"\nBody of {subject}\nFrom the start of a line\n>From a quoted one\n"
 
 
@@ -55,13 +55,13 @@ def zipped(archive, name, messages):
 
 
 def test_imports_once_across_sources_and_tags_both(archive):
-    zipped(archive, "export.zip", [message("<one@x>", "one", "Inbox,Category Updates")])
+    zipped(archive, "export.zip", [message("<one@x>", "one", "Receipts,Travel Plans")])
     write_mbox(archive.incoming / "work" / "work.mbox", [message("<one@x>", "one again"), message("<two@x>", "two")])
 
     assert run(archive)
 
     assert notmuch("count", "*") == ["2"]
-    assert tags("id:one@x") == ["gmail/category-updates", "gmail/inbox", "source/personal", "source/work"]
+    assert tags("id:one@x") == ["label/receipts", "label/travel-plans", "source/personal", "source/work"]
     assert tags("id:two@x") == ["source/work"]
     assert (archive.done / "work" / "work.mbox").exists()
     assert (archive.done / "personal" / "export.zip").exists()
@@ -78,12 +78,12 @@ def test_stores_messages_unchanged(archive):
 
 
 def test_tags_messages_without_or_with_odd_message_ids(archive):
-    zipped(archive, "export.zip", [message(None, "no id", "Opened"), message('<we"ird %20 id@x>', "weird", "Important")])
+    zipped(archive, "export.zip", [message(None, "no id", "Family"), message('<we"ird %20 id@x>', "weird", "Later")])
 
     run(archive)
 
-    assert tags('subject:"no id"') == ["gmail/opened", "source/personal"]
-    assert tags("subject:weird") == ["gmail/important", "source/personal"]
+    assert tags('subject:"no id"') == ["label/family", "source/personal"]
+    assert tags("subject:weird") == ["label/later", "source/personal"]
 
 
 def test_a_later_export_adds_only_new_mail(archive):
@@ -109,10 +109,10 @@ def test_unreadable_and_hidden_files(archive):
 
 
 def test_tags_are_rebuilt_from_sources_after_losing_the_index(archive):
-    zipped(archive, "export.zip", [message("<one@x>", "one", "Inbox")])
+    zipped(archive, "export.zip", [message("<one@x>", "one", "Receipts")])
     run(archive)
     subprocess.run(["rm", "-rf", str(archive.maildir / ".notmuch")], check=True)
 
     run(archive)
 
-    assert tags("id:one@x") == ["gmail/inbox", "source/personal"]
+    assert tags("id:one@x") == ["label/receipts", "source/personal"]

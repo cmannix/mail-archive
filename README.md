@@ -19,9 +19,9 @@ from it and can be rebuilt at any time.
   `>*From `), so the stored message is the one that was sent. An export written
   as plain mbox (mboxo) loses one `>` from body lines that began `>From `.
 - Every message seen is appended to `<root>/sources.jsonl`, with its source and
-  Gmail labels, from the `X-Gmail-Labels` header where an export includes it.
+  labels, where the export carries them in a header (see `LABEL_HEADERS`).
 - Tags are rebuilt from `sources.jsonl` after each import: `source/<source>` for
-  every source a message was seen in, and `gmail/<label>` for its labels.
+  every source a message was seen in, and `label/<label>` for its labels.
 - Imported files move to `<root>/imported/<source>/`; files that could not be read
   move to `<root>/failed/<source>/` and make the command exit 1. Hidden files are
   treated as copies in progress and left alone.

@@ -3,8 +3,8 @@
 Accepts .mbox files and .zip files containing them.
 Each message is stored unchanged in maildir/cur/, named after a hash of its
 Message-ID, so a message already in the archive from any source is skipped.
-Every message seen is recorded in sources.jsonl with its source and Gmail
-labels; tags are rebuilt from that file, never stored only in the index.
+Every message seen is recorded in sources.jsonl with its source and the
+labels its export carried; tags are rebuilt from that file, never stored only in the index.
 
 notmuch must be on PATH, and NOTMUCH_CONFIG must point at a configuration whose
 database path is <root>/maildir.
@@ -50,9 +50,16 @@ def message_key(raw, msgid):
     return hashlib.sha256(basis).hexdigest()[:40]
 
 
-def gmail_labels(msg):
-    value = msg.get("X-Gmail-Labels", "")
-    return [label.strip() for label in value.split(",") if label.strip()]
+# Headers in which an export carries each message's labels, as comma-separated
+# names.
+LABEL_HEADERS = ["X-Gmail-Labels"]
+
+
+def labels(msg):
+    found = []
+    for header in LABEL_HEADERS:
+        found += [label.strip() for label in msg.get(header, "").split(",") if label.strip()]
+    return found
 
 
 def import_mbox(archive, path, source, log):
@@ -71,7 +78,7 @@ def import_mbox(archive, path, source, log):
             os.replace(tmp, target)
             added += 1
         seen += 1
-        log.write(json.dumps({"key": name, "msgid": msgid, "source": source, "labels": gmail_labels(msg)}) + "\n")
+        log.write(json.dumps({"key": name, "msgid": msgid, "source": source, "labels": labels(msg)}) + "\n")
     return added, seen
 
 
@@ -110,14 +117,14 @@ def notmuch_query(archive, record):
 
 
 def retag(archive):
-    """Adds a tag for each source and Gmail label recorded in sources.jsonl."""
+    """Adds a tag for each source and label recorded in sources.jsonl."""
     tags = {}
     with archive.sources.open() as log:
         for line in log:
             record = json.loads(line)
             entry = tags.setdefault(notmuch_query(archive, record), set())
             entry.add(f"source/{tag_name(record['source'])}")
-            entry.update(f"gmail/{tag_name(label)}" for label in record["labels"])
+            entry.update(f"label/{tag_name(label)}" for label in record["labels"])
     batch = "".join(f"{' '.join('+' + t for t in sorted(ts))} -- {q}\n" for q, ts in tags.items())
     subprocess.run(["notmuch", "tag", "--batch"], input=batch, text=True, check=True)
 
