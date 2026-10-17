@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 
 [project.scripts]
 mail-archive-import = "mail_archive.importer:main"
+mail-archive-report = "mail_archive.report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

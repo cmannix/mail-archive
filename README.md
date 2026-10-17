@@ -32,6 +32,28 @@ notmuch must be on `PATH` (the Nix package wraps it in), and `NOTMUCH_CONFIG` mu
 name a configuration whose database path is `<root>/maildir`, with `synchronize_flags`
 off and no tags applied by `notmuch new`.
 
+## Sender report
+
+`mail-archive-report <root> --me <address> [--me <address> ...] [--output file.csv]`
+writes one CSV row per sender, built from message headers only: no subjects or
+bodies are copied into it, so it can be read without reading the mail.
+
+| Column | Meaning |
+|---|---|
+| `sender`, `name` | From address, and its most common display name |
+| `messages`, `last_12_months`, `previous_12_months` | How much they send, and the trend |
+| `first`, `last` | Dates of the oldest and newest message |
+| `bulk_share` | Share sent as bulk or list mail (`List-Unsubscribe`, `List-Id`, `Precedence`, `Auto-Submitted`) |
+| `noreply` | The address looks automated (no-reply, notifications, alerts) |
+| `attachment_share` | Share sent as `multipart/mixed`, which usually means attachments |
+| `you_wrote_to` | Messages from a `--me` address to them: the clearest sign of a real contact |
+| `delivered_to` | Addresses in their messages' `Delivered-To` headers |
+| `kind`, `kinds` | Subject patterns: `receipt`, `security`, `delivery`, `account`, counted; `kind` is the main one when it covers a third of their messages |
+| `suggestion`, `reason` | A suggested home: `imbox`, `paper trail`, `feed`, `unsubscribe or feed`, with `auto-delete` for short-lived mail, `none` when they have gone quiet, `review` otherwise |
+
+Messages from a `--me` address are counted as written by the owner, not as a
+sender. Rows are ordered by mail in the last 12 months.
+
 ## Development
 
 `nix develop` gives Python, pytest and notmuch; run `pytest`. `nix flake check`
