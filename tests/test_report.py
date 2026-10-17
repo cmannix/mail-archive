@@ -77,3 +77,27 @@ def test_decodes_names_and_leaves_subjects_out(maildir, tmp_path):
     (row,) = list(csv.DictReader(out.open()))
     assert row["name"] == "Élise"
     assert "private subject" not in out.read_text()
+
+
+def test_bulk_senders_written_to_once_monitoring_and_more_records(maildir):
+    n = 0
+    for i in range(20):
+        n += 1
+        add(maildir, n, "Venue <members@venue.example>", f"What's on {i}", extra="List-Unsubscribe: <mailto:u@venue.example>\n")
+    n += 1
+    add(maildir, n, "Me <me@example.com>", "Membership question", to="members@venue.example")
+    for i in range(12):
+        n += 1
+        add(maildir, n, "Monitor <alerts@monitor.example>", f"[DOWN] job {i}", extra="List-Unsubscribe: <mailto:u@monitor.example>\n")
+    n += 1
+    add(maildir, n, "Market <transaction@market.example>", "Transaction complete")
+    n += 1
+    add(maildir, n, "Lender <updates@lender.example>", "Mortgage application received")
+
+    rows = by_sender(build(maildir, ["me@example.com"], now=NOW))
+
+    venue = rows["members@venue.example"]
+    assert (venue["category"], venue["drop_candidate"], venue["you_wrote_to"]) == ("newsletters", False, 1)
+    assert (rows["alerts@monitor.example"]["category"], rows["alerts@monitor.example"]["short_lived"]) == ("alerts", False)
+    assert rows["transaction@market.example"]["category"] == "records"
+    assert rows["updates@lender.example"]["category"] == "records"
