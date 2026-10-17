@@ -43,10 +43,13 @@ bodies are copied into it, so it can be read without reading the mail.
 | `sender`, `name` | From address, and its most common display name |
 | `messages`, `last_12_months`, `previous_12_months` | How much they send, and the trend |
 | `first`, `last` | Dates of the oldest and newest message |
+| `spam_score` | Average spam-filter score, from `X-Spam-Score` or `X-Spamd-Bar` (one point per `+`, minus one per `-`), where messages carry one |
 | `bulk_share` | Share sent as bulk or list mail (`List-Unsubscribe`, `List-Id`, `Precedence`, `Auto-Submitted`) |
 | `noreply` | The address looks automated (no-reply, notifications, alerts) |
 | `attachment_share` | Share sent as `multipart/mixed`, which usually means attachments |
 | `you_wrote_to` | Messages from a `--me` address to them: the clearest sign of a real contact |
+| `original_to` | Addresses in their messages' `X-Original-To` headers: where each was sent |
+| `forwarded_for` | Accounts that forwarded their messages (first address of `X-Forwarded-For`) |
 | `delivered_to` | Addresses in their messages' `Delivered-To` headers |
 | `kind`, `kinds` | Subject patterns: `receipt`, `security`, `delivery`, `account`, `monitoring`, counted; `kind` is the main one when it covers a third of their messages |
 | `category` | A suggested category: `personal` (written to, and mostly not bulk), `alerts` (codes, sign-in, security and monitoring), `records` (receipts, orders, statements, deliveries), `notices` (account and policy changes, other automated mail), `newsletters` (bulk), `inactive` (nothing in 12 months) or `review` (no clear signal) |

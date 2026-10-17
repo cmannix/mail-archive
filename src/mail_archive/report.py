@@ -20,17 +20,33 @@ from pathlib import Path
 from mail_archive.importer import read_headers
 
 KINDS = {
-    "receipt": r"receipt|order|invoice|payment|paid|statement|bill\b|refund|booking|confirmation|transaction|application|mortgage|renewal|\btax\b",
+    "receipt": r"receipt|order|invoice|payment|paid|statement|bill\b|refund|booking|confirmation|purchase|transaction|application|mortgage|renewal|\btax\b",
     "security": r"\bcode\b|verif|password|sign.?in|log.?in|security|new device|two.factor|2fa",
     "delivery": r"deliver|dispatch|shipped|shipping|tracking|out for|parcel|collect",
     "account": r"terms|privacy|policy|update to your|changes to|your account",
     "monitoring": r"\bdown\b|fail|error|outage|incident|unreachable",
 }
+def spam_score(msg):
+    """The spam filter's score, where the message carries one: X-Spam-Score as a
+    number, or X-Spamd-Bar, whose "+" and "-" marks each count one point."""
+    value = msg.get("X-Spam-Score")
+    if value:
+        try:
+            return float(value.strip().split()[0])
+        except ValueError:
+            pass
+    bar = msg.get("X-Spamd-Bar")
+    if bar is not None:
+        return float(bar.count("+") - bar.count("-"))
+    return None
+
+
 NOREPLY = re.compile(r"no.?reply|do.?not.?reply|notifications?@|mailer|alerts?@|automated", re.I)
 
 COLUMNS = [
     "sender", "name", "messages", "last_12_months", "previous_12_months", "first", "last",
-    "bulk_share", "noreply", "attachment_share", "you_wrote_to", "delivered_to",
+    "bulk_share", "spam_score", "noreply", "attachment_share", "you_wrote_to",
+    "original_to", "forwarded_for", "delivered_to",
     "kind", "kinds", "category", "short_lived", "drop_candidate", "reason",
 ]
 
@@ -102,7 +118,7 @@ def build(maildir, me, now=None):
     now = now or datetime.now(timezone.utc)
     year_ago, two_years_ago = now - timedelta(days=365), now - timedelta(days=730)
     me = {a.lower() for a in me}
-    senders = defaultdict(lambda: {"names": Counter(), "dates": [], "bulk": 0, "attachments": 0, "kinds": Counter(), "delivered": Counter()})
+    senders = defaultdict(lambda: {"names": Counter(), "dates": [], "bulk": 0, "attachments": 0, "kinds": Counter(), "delivered": Counter(), "original": Counter(), "forwarded": Counter(), "spam": []})
     wrote_to = Counter()
 
     for path in sorted(Path(maildir, "cur").iterdir()):
@@ -126,6 +142,12 @@ def build(maildir, me, now=None):
         s["attachments"] += (msg.get_content_type() == "multipart/mixed")
         s["kinds"].update(kinds_of(text(msg.get("Subject", ""))))
         s["delivered"].update(a.lower() for _, a in getaddresses(msg.get_all("Delivered-To", [])) if a)
+        s["original"].update(a.lower() for _, a in getaddresses(msg.get_all("X-Original-To", [])) if a)
+        # X-Forwarded-For lists the forwarding account first, then the target.
+        s["forwarded"].update(a.split()[0].lower() for a in msg.get_all("X-Forwarded-For", []) if a.split())
+        score = spam_score(msg)
+        if score is not None:
+            s["spam"].append(score)
         s["count"] = s.get("count", 0) + 1
 
     rows = []
@@ -144,6 +166,9 @@ def build(maildir, me, now=None):
             "noreply": bool(NOREPLY.search(address)),
             "attachment_share": round(s["attachments"] / s["count"], 2),
             "you_wrote_to": wrote_to[address],
+            "spam_score": round(sum(s["spam"]) / len(s["spam"]), 1) if s["spam"] else "",
+            "original_to": " ".join(a for a, _ in s["original"].most_common()),
+            "forwarded_for": " ".join(a for a, _ in s["forwarded"].most_common()),
             "delivered_to": " ".join(a for a, _ in s["delivered"].most_common()),
             # A kind counts when at least a third of the sender's subjects show it.
             "kind": kind if hits * 3 >= s["count"] else "",
