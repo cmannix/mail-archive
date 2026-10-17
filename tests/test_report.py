@@ -101,3 +101,17 @@ def test_bulk_senders_written_to_once_monitoring_and_more_records(maildir):
     assert (rows["alerts@monitor.example"]["category"], rows["alerts@monitor.example"]["short_lived"]) == ("alerts", False)
     assert rows["transaction@market.example"]["category"] == "records"
     assert rows["updates@lender.example"]["category"] == "records"
+
+
+def test_routing_headers_and_spam_scores(maildir):
+    add(maildir, 1, "a@x.example", "one", extra="X-Original-To: old@example.com\nX-Forwarded-For: old@example.com new@example.com\nX-Spamd-Bar: +++\n")
+    add(maildir, 2, "a@x.example", "two", extra="X-Original-To: new@example.com\nX-Spamd-Bar: -\n")
+    add(maildir, 3, "b@y.example", "Your purchase from a shop", extra="X-Spam-Score: 4.5 (yes)\n")
+
+    rows = by_sender(build(maildir, [], now=NOW))
+
+    a = rows["a@x.example"]
+    assert set(a["original_to"].split()) == {"old@example.com", "new@example.com"}
+    assert a["forwarded_for"] == "old@example.com"
+    assert a["spam_score"] == 1.0
+    assert (rows["b@y.example"]["spam_score"], rows["b@y.example"]["category"]) == (4.5, "records")
