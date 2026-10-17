@@ -45,15 +45,15 @@ def test_suggestions(maildir):
 
     rows = by_sender(build(maildir, ["me@example.com"], now=NOW))
 
-    assert rows["news@shop.example"]["suggestion"] == "unsubscribe or feed"
+    assert (rows["news@shop.example"]["category"], rows["news@shop.example"]["drop_candidate"]) == ("newsletters", True)
     assert rows["news@shop.example"]["bulk_share"] == 1.0
-    assert rows["orders@shop.example"]["suggestion"] == "paper trail"
-    assert rows["no-reply@bank.example"]["suggestion"] == "imbox, auto-delete"
+    assert rows["orders@shop.example"]["category"] == "records"
+    assert (rows["no-reply@bank.example"]["category"], rows["no-reply@bank.example"]["short_lived"]) == ("alerts", True)
     assert rows["no-reply@bank.example"]["noreply"] is True
-    assert rows["old@gone.example"]["suggestion"] == "none"
+    assert rows["old@gone.example"]["category"] == "inactive"
     assert rows["old@gone.example"]["previous_12_months"] == 0
     assert rows["friend@example.org"]["you_wrote_to"] == 1
-    assert rows["friend@example.org"]["suggestion"] == "imbox"
+    assert rows["friend@example.org"]["category"] == "personal"
     assert "me@example.com" not in rows
 
 

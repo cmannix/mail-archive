@@ -49,7 +49,10 @@ bodies are copied into it, so it can be read without reading the mail.
 | `you_wrote_to` | Messages from a `--me` address to them: the clearest sign of a real contact |
 | `delivered_to` | Addresses in their messages' `Delivered-To` headers |
 | `kind`, `kinds` | Subject patterns: `receipt`, `security`, `delivery`, `account`, counted; `kind` is the main one when it covers a third of their messages |
-| `suggestion`, `reason` | A suggested home: `imbox`, `paper trail`, `feed`, `unsubscribe or feed`, with `auto-delete` for short-lived mail, `none` when they have gone quiet, `review` otherwise |
+| `category` | A suggested category: `personal`, `alerts` (codes, sign-in and security notices), `records` (receipts, orders, statements, deliveries), `notices` (account and policy changes, other automated mail), `newsletters` (bulk), `inactive` (nothing in 12 months) or `review` (no clear signal) |
+| `short_lived` | Only useful for a short time (codes, alerts, delivery notices) |
+| `drop_candidate` | Frequent bulk mail the owner has never written to |
+| `reason` | Why the category was suggested |
 
 Messages from a `--me` address are counted as written by the owner, not as a
 sender. Rows are ordered by mail in the last 12 months.

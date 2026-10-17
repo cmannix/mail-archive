@@ -30,7 +30,7 @@ NOREPLY = re.compile(r"no.?reply|do.?not.?reply|notifications?@|mailer|alerts?@|
 COLUMNS = [
     "sender", "name", "messages", "last_12_months", "previous_12_months", "first", "last",
     "bulk_share", "noreply", "attachment_share", "you_wrote_to", "delivered_to",
-    "kind", "kinds", "suggestion", "reason",
+    "kind", "kinds", "category", "short_lived", "drop_candidate", "reason",
 ]
 
 
@@ -63,27 +63,33 @@ def kinds_of(subject):
 
 
 def suggest(row):
-    """A suggested home for a sender's mail, with the reason."""
+    """A suggested category for a sender's mail, whether it is only useful for a
+    short time, whether it is a candidate to stop receiving, and the reason.
+
+    Categories: personal, alerts (codes, sign-in and security notices),
+    records (receipts, orders, statements, deliveries), notices (account and
+    policy changes, other automated mail), newsletters (bulk mail), inactive
+    (nothing in the last 12 months) and review (no clear signal).
+    """
     if row["you_wrote_to"]:
-        return "imbox", "you have written to them"
+        return "personal", False, False, "the owner has written to them"
     kind = row["kind"]
     if kind == "security":
-        return "imbox, auto-delete", "codes and sign-in alerts: needed at once, not later"
+        return "alerts", True, False, "codes and sign-in alerts"
     if kind == "receipt":
-        return "paper trail", "receipts, orders and statements"
+        return "records", False, False, "receipts, orders and statements"
     if kind == "delivery":
-        return "paper trail, auto-delete", "delivery notices"
+        return "records", True, False, "delivery notices"
     if row["last_12_months"] == 0:
-        return "none", "nothing in the last 12 months"
+        return "inactive", False, False, "nothing in the last 12 months"
     if row["bulk_share"] >= 0.5:
-        if row["last_12_months"] >= 12:
-            return "unsubscribe or feed", "frequent bulk mail you have never written to"
-        return "feed", "bulk mail"
+        frequent = row["last_12_months"] >= 12
+        return "newsletters", False, frequent, "frequent bulk mail, never written to" if frequent else "bulk mail"
     if kind == "account":
-        return "paper trail", "account and policy notices"
+        return "notices", False, False, "account and policy notices"
     if row["noreply"]:
-        return "paper trail", "automated mail"
-    return "review", "no clear signal"
+        return "notices", False, False, "automated mail"
+    return "review", False, False, "no clear signal"
 
 
 def build(maildir, me, now=None):
@@ -137,7 +143,7 @@ def build(maildir, me, now=None):
             "kind": kind if hits * 3 >= s["count"] else "",
             "kinds": " ".join(f"{k}:{n}" for k, n in s["kinds"].most_common()),
         }
-        row["suggestion"], row["reason"] = suggest(row)
+        row["category"], row["short_lived"], row["drop_candidate"], row["reason"] = suggest(row)
         rows.append(row)
     rows.sort(key=lambda r: (-r["last_12_months"], -r["messages"], r["sender"]))
     return rows
