@@ -21,7 +21,9 @@ from it and can be rebuilt at any time.
 - Every message seen is appended to `<root>/sources.jsonl`, with its source and
   labels, where the export carries them in a header (see `LABEL_HEADERS`).
 - Tags are rebuilt from `sources.jsonl` after each import: `source/<source>` for
-  every source a message was seen in, and `label/<label>` for its labels.
+  every source a message was seen in, `label/<label>` for its labels, and
+  `delivered/<address>` for each address in its `Delivered-To` headers (a forwarded
+  message carries one per hop, so this shows where it first arrived).
 - Imported files move to `<root>/imported/<source>/`; files that could not be read
   move to `<root>/failed/<source>/` and make the command exit 1. Hidden files are
   treated as copies in progress and left alone.

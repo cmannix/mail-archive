@@ -21,6 +21,7 @@ import sys
 import tempfile
 import zipfile
 from email.parser import BytesHeaderParser
+from email.utils import getaddresses
 from pathlib import Path
 
 _headers = BytesHeaderParser()
@@ -102,7 +103,26 @@ def import_file(archive, path, source, log):
 
 def tag_name(text):
     """A tag made only of characters notmuch's --batch input leaves as they are."""
-    return "".join(c if c.isalnum() or c in "-_/." else "-" for c in text.lower())
+    return "".join(c if c.isalnum() or c in "-_/.@+" else "-" for c in text.lower())
+
+
+def read_headers(path):
+    """The header block of a stored message, without reading its body."""
+    head = b""
+    with open(path, "rb") as f:
+        while b"\n\n" not in head and b"\r\n\r\n" not in head:
+            chunk = f.read(16384)
+            if not chunk:
+                break
+            head += chunk
+    return _headers.parsebytes(head)
+
+
+def delivered_to(archive, key):
+    """Every address a mail system recorded delivering the message to. Each hop
+    adds its own Delivered-To header, so a forwarded message has several."""
+    msg = read_headers(archive.message_path(key))
+    return {addr.lower() for _, addr in getaddresses(msg.get_all("Delivered-To", [])) if addr}
 
 
 def notmuch_query(archive, record):
@@ -117,14 +137,17 @@ def notmuch_query(archive, record):
 
 
 def retag(archive):
-    """Adds a tag for each source and label recorded in sources.jsonl."""
+    """Adds a tag for each source and label recorded in sources.jsonl, and for
+    each address in the stored message's Delivered-To headers."""
     tags = {}
     with archive.sources.open() as log:
         for line in log:
             record = json.loads(line)
-            entry = tags.setdefault(notmuch_query(archive, record), set())
-            entry.add(f"source/{tag_name(record['source'])}")
-            entry.update(f"label/{tag_name(label)}" for label in record["labels"])
+            query = notmuch_query(archive, record)
+            if query not in tags:
+                tags[query] = {f"delivered/{tag_name(a)}" for a in delivered_to(archive, record["key"])}
+            tags[query].add(f"source/{tag_name(record['source'])}")
+            tags[query].update(f"label/{tag_name(label)}" for label in record["labels"])
     batch = "".join(f"{' '.join('+' + t for t in sorted(ts))} -- {q}\n" for q, ts in tags.items())
     subprocess.run(["notmuch", "tag", "--batch"], input=batch, text=True, check=True)
 
