@@ -123,12 +123,14 @@ def build(maildir, me, now=None):
 
     for path in sorted(Path(maildir, "cur").iterdir()):
         msg = read_headers(path)
-        from_ = getaddresses([text(msg.get("From", ""))])
+        # Addresses are split out before names are decoded: a decoded name can
+        # contain a comma ("Smith, John") that would otherwise split it in two.
+        from_ = getaddresses([msg.get("From", "")])
         if not from_ or not from_[0][1]:
             continue
-        name, address = from_[0][0], from_[0][1].lower()
+        name, address = text(from_[0][0]), from_[0][1].lower()
         if address in me:
-            for _, to in getaddresses([text(msg.get(h, "")) for h in ("To", "Cc")]):
+            for _, to in getaddresses([msg.get(h, "") for h in ("To", "Cc")]):
                 if to and to.lower() not in me:
                     wrote_to[to.lower()] += 1
             continue

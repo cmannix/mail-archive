@@ -1,3 +1,4 @@
+import base64
 import csv
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -115,3 +116,15 @@ def test_routing_headers_and_spam_scores(maildir):
     assert a["forwarded_for"] == "old@example.com"
     assert a["spam_score"] == 1.0
     assert (rows["b@y.example"]["spam_score"], rows["b@y.example"]["category"]) == (4.5, "records")
+
+
+def test_names_with_commas_stay_one_sender(maildir):
+    encoded = "=?UTF-8?B?" + base64.b64encode("Smith, John".encode()).decode() + "?="
+    add(maildir, 1, f"{encoded} <john@bank.example>", "Statement")
+    add(maildir, 2, "Me <me@example.com>", "Hello", to=f"{encoded} <john@bank.example>, other@example.org")
+
+    rows = by_sender(build(maildir, ["me@example.com"], now=NOW))
+
+    assert set(rows) == {"john@bank.example"}
+    assert rows["john@bank.example"]["name"] == "Smith, John"
+    assert rows["john@bank.example"]["you_wrote_to"] == 1

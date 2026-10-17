@@ -128,3 +128,29 @@ def test_tags_every_delivered_to_address(archive):
     assert tags("id:fwd@x") == ["delivered/first+old@example.com", "delivered/second@example.com", "source/work"]
     assert notmuch("count", "tag:delivered/first+old@example.com") == ["1"]
     assert tags("id:direct@x") == ["source/work"]
+
+
+def test_tags_messages_whatever_their_message_id_header(archive):
+    odd = [
+        "From: a@example.com\nMessage-ID: plain@x\nSubject: no brackets\n\nbody\n",
+        "From: a@example.com\nMessage-ID: <first@x> <second@x>\nSubject: two ids\n\nbody\n",
+        "From: a@example.com\nMessage-ID:\n <folded@x>\nSubject: folded\n\nbody\n",
+        "From: a@example.com\nMessage-ID: <c@x> (a comment)\nSubject: comment\n\nbody\n",
+    ]
+    write_mbox(archive.incoming / "work" / "odd.mbox", odd)
+
+    run(archive)
+
+    for subject in ("no brackets", "two ids", "folded", "comment"):
+        assert tags(f'subject:"{subject}"') == ["source/work"], subject
+
+
+def test_stored_messages_without_a_record_are_recorded_once(archive):
+    write_mbox(archive.incoming / "work" / "a.mbox", [message("<one@x>", "one")])
+    run(archive)
+    stray = archive.maildir / "cur" / "stray:2,S"
+    stray.write_text("From: b@example.com\nMessage-ID: <stray@x>\nSubject: stray\n\nbody\n")
+
+    assert not run(archive)
+    assert tags("id:stray@x") == ["source/unknown"]
+    assert run(archive)
