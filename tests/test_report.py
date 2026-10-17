@@ -128,3 +128,15 @@ def test_names_with_commas_stay_one_sender(maildir):
     assert set(rows) == {"john@bank.example"}
     assert rows["john@bank.example"]["name"] == "Smith, John"
     assert rows["john@bank.example"]["you_wrote_to"] == 1
+
+
+def test_unsubscribe_link_from_newest_message(maildir):
+    add(maildir, 1, "n@list.example", "old", days_ago=100, extra="List-Unsubscribe: <https://list.example/old>\n")
+    add(maildir, 2, "n@list.example", "new", days_ago=5,
+        extra="List-Unsubscribe: <mailto:u@list.example>, <https://list.example/new>\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\n")
+    add(maildir, 3, "m@mailto.example", "x", extra="List-Unsubscribe: <mailto:leave@mailto.example>\n")
+
+    rows = by_sender(build(maildir, [], now=NOW))
+
+    assert (rows["n@list.example"]["unsubscribe"], rows["n@list.example"]["one_click"]) == ("https://list.example/new", True)
+    assert (rows["m@mailto.example"]["unsubscribe"], rows["m@mailto.example"]["one_click"]) == ("mailto:leave@mailto.example", False)
