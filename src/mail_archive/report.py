@@ -20,10 +20,11 @@ from pathlib import Path
 from mail_archive.importer import read_headers
 
 KINDS = {
-    "receipt": r"receipt|order|invoice|payment|paid|statement|bill\b|refund|booking|confirmation",
+    "receipt": r"receipt|order|invoice|payment|paid|statement|bill\b|refund|booking|confirmation|transaction|application|mortgage|renewal|\btax\b",
     "security": r"\bcode\b|verif|password|sign.?in|log.?in|security|new device|two.factor|2fa",
     "delivery": r"deliver|dispatch|shipped|shipping|tracking|out for|parcel|collect",
     "account": r"terms|privacy|policy|update to your|changes to|your account",
+    "monitoring": r"\bdown\b|fail|error|outage|incident|unreachable",
 }
 NOREPLY = re.compile(r"no.?reply|do.?not.?reply|notifications?@|mailer|alerts?@|automated", re.I)
 
@@ -66,16 +67,19 @@ def suggest(row):
     """A suggested category for a sender's mail, whether it is only useful for a
     short time, whether it is a candidate to stop receiving, and the reason.
 
-    Categories: personal, alerts (codes, sign-in and security notices),
+    Categories: personal, alerts (codes, sign-in, security and monitoring),
     records (receipts, orders, statements, deliveries), notices (account and
     policy changes, other automated mail), newsletters (bulk mail), inactive
     (nothing in the last 12 months) and review (no clear signal).
     """
-    if row["you_wrote_to"]:
+    engaged = row["you_wrote_to"] > 0
+    if engaged and row["bulk_share"] < 0.5:
         return "personal", False, False, "the owner has written to them"
     kind = row["kind"]
     if kind == "security":
         return "alerts", True, False, "codes and sign-in alerts"
+    if kind == "monitoring":
+        return "alerts", False, False, "failure and outage alerts"
     if kind == "receipt":
         return "records", False, False, "receipts, orders and statements"
     if kind == "delivery":
@@ -83,6 +87,8 @@ def suggest(row):
     if row["last_12_months"] == 0:
         return "inactive", False, False, "nothing in the last 12 months"
     if row["bulk_share"] >= 0.5:
+        if engaged:
+            return "newsletters", False, False, "bulk mail from a sender the owner has written to"
         frequent = row["last_12_months"] >= 12
         return "newsletters", False, frequent, "frequent bulk mail, never written to" if frequent else "bulk mail"
     if kind == "account":

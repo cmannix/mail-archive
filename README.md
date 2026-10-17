@@ -48,8 +48,8 @@ bodies are copied into it, so it can be read without reading the mail.
 | `attachment_share` | Share sent as `multipart/mixed`, which usually means attachments |
 | `you_wrote_to` | Messages from a `--me` address to them: the clearest sign of a real contact |
 | `delivered_to` | Addresses in their messages' `Delivered-To` headers |
-| `kind`, `kinds` | Subject patterns: `receipt`, `security`, `delivery`, `account`, counted; `kind` is the main one when it covers a third of their messages |
-| `category` | A suggested category: `personal`, `alerts` (codes, sign-in and security notices), `records` (receipts, orders, statements, deliveries), `notices` (account and policy changes, other automated mail), `newsletters` (bulk), `inactive` (nothing in 12 months) or `review` (no clear signal) |
+| `kind`, `kinds` | Subject patterns: `receipt`, `security`, `delivery`, `account`, `monitoring`, counted; `kind` is the main one when it covers a third of their messages |
+| `category` | A suggested category: `personal` (written to, and mostly not bulk), `alerts` (codes, sign-in, security and monitoring), `records` (receipts, orders, statements, deliveries), `notices` (account and policy changes, other automated mail), `newsletters` (bulk), `inactive` (nothing in 12 months) or `review` (no clear signal) |
 | `short_lived` | Only useful for a short time (codes, alerts, delivery notices) |
 | `drop_candidate` | Frequent bulk mail the owner has never written to |
 | `reason` | Why the category was suggested |
