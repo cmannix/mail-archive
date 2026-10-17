@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mail-archive"
+version = "0.1.0"
+description = "A provider-independent archive of email in Maildir, indexed by notmuch"
+requires-python = ">=3.11"
+
+[project.scripts]
+mail-archive-import = "mail_archive.importer:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
