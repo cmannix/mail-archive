@@ -41,6 +41,17 @@ def spam_score(msg):
     return None
 
 
+def unsubscribe_link(msg):
+    """The message's List-Unsubscribe target, preferring a web link to mailto,
+    and whether the sender accepts one-click unsubscribing (RFC 8058)."""
+    targets = re.findall(r"<([^>]+)>", msg.get("List-Unsubscribe", ""))
+    if not targets:
+        return "", False
+    web = [t for t in targets if t.lower().startswith("https://")]
+    one_click = "one-click" in (msg.get("List-Unsubscribe-Post") or "").lower()
+    return (web or targets)[0].strip(), one_click and bool(web)
+
+
 NOREPLY = re.compile(r"no.?reply|do.?not.?reply|notifications?@|mailer|alerts?@|automated", re.I)
 
 COLUMNS = [
@@ -48,6 +59,7 @@ COLUMNS = [
     "bulk_share", "spam_score", "noreply", "attachment_share", "you_wrote_to",
     "original_to", "forwarded_for", "delivered_to",
     "kind", "kinds", "category", "short_lived", "drop_candidate", "reason",
+    "unsubscribe", "one_click",
 ]
 
 
@@ -118,17 +130,19 @@ def build(maildir, me, now=None):
     now = now or datetime.now(timezone.utc)
     year_ago, two_years_ago = now - timedelta(days=365), now - timedelta(days=730)
     me = {a.lower() for a in me}
-    senders = defaultdict(lambda: {"names": Counter(), "dates": [], "bulk": 0, "attachments": 0, "kinds": Counter(), "delivered": Counter(), "original": Counter(), "forwarded": Counter(), "spam": []})
+    senders = defaultdict(lambda: {"names": Counter(), "dates": [], "bulk": 0, "attachments": 0, "kinds": Counter(), "delivered": Counter(), "original": Counter(), "forwarded": Counter(), "spam": [], "unsubscribe": (None, "", False)})
     wrote_to = Counter()
 
     for path in sorted(Path(maildir, "cur").iterdir()):
         msg = read_headers(path)
-        from_ = getaddresses([text(msg.get("From", ""))])
+        # Addresses are split out before names are decoded: a decoded name can
+        # contain a comma ("Smith, John") that would otherwise split it in two.
+        from_ = getaddresses([msg.get("From", "")])
         if not from_ or not from_[0][1]:
             continue
-        name, address = from_[0][0], from_[0][1].lower()
+        name, address = text(from_[0][0]), from_[0][1].lower()
         if address in me:
-            for _, to in getaddresses([text(msg.get(h, "")) for h in ("To", "Cc")]):
+            for _, to in getaddresses([msg.get(h, "") for h in ("To", "Cc")]):
                 if to and to.lower() not in me:
                     wrote_to[to.lower()] += 1
             continue
@@ -145,6 +159,11 @@ def build(maildir, me, now=None):
         s["original"].update(a.lower() for _, a in getaddresses(msg.get_all("X-Original-To", [])) if a)
         # X-Forwarded-For lists the forwarding account first, then the target.
         s["forwarded"].update(a.split()[0].lower() for a in msg.get_all("X-Forwarded-For", []) if a.split())
+        link, one_click = unsubscribe_link(msg)
+        if link and date and (s["unsubscribe"][0] is None or date > s["unsubscribe"][0]):
+            s["unsubscribe"] = (date, link, one_click)
+        elif link and not s["unsubscribe"][1]:
+            s["unsubscribe"] = (s["unsubscribe"][0], link, one_click)
         score = spam_score(msg)
         if score is not None:
             s["spam"].append(score)
@@ -175,6 +194,7 @@ def build(maildir, me, now=None):
             "kinds": " ".join(f"{k}:{n}" for k, n in s["kinds"].most_common()),
         }
         row["category"], row["short_lived"], row["drop_candidate"], row["reason"] = suggest(row)
+        row["unsubscribe"], row["one_click"] = s["unsubscribe"][1], s["unsubscribe"][2]
         rows.append(row)
     rows.sort(key=lambda r: (-r["last_12_months"], -r["messages"], r["sender"]))
     return rows

@@ -56,6 +56,8 @@ bodies are copied into it, so it can be read without reading the mail.
 | `short_lived` | Only useful for a short time (codes, alerts, delivery notices) |
 | `drop_candidate` | Frequent bulk mail the owner has never written to |
 | `reason` | Why the category was suggested |
+| `unsubscribe` | The `List-Unsubscribe` target from the sender's newest message that has one, a web link in preference to `mailto:` |
+| `one_click` | That link accepts one-click unsubscribing (RFC 8058 `List-Unsubscribe-Post`) |
 
 Messages from a `--me` address are counted as written by the owner, not as a
 sender. Rows are ordered by mail in the last 12 months.
