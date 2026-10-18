@@ -38,6 +38,10 @@ off and no tags applied by `notmuch new`.
 writes one CSV row per sender, built from message headers only: no subjects or
 bodies are copied into it, so it can be read without reading the mail.
 
+`--since YYYY-MM-DD` counts only messages dated on or after that day, and
+`--delivered-to <address>` only messages with that address in a `Delivered-To` header,
+so a report can cover one mailbox or period of a larger archive.
+
 | Column | Meaning |
 |---|---|
 | `sender`, `name` | From address, and its most common display name |
