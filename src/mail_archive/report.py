@@ -12,7 +12,7 @@ import csv
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.header import decode_header, make_header
 from email.utils import getaddresses, parsedate_to_datetime
 from pathlib import Path
@@ -126,7 +126,9 @@ def suggest(row):
     return "review", False, False, "no clear signal"
 
 
-def build(maildir, me, now=None):
+def build(maildir, me, now=None, since=None, delivered_to=None):
+    """One row per sender. `since` (a datetime) drops older messages, and
+    `delivered_to` keeps only messages with that address in a Delivered-To header."""
     now = now or datetime.now(timezone.utc)
     year_ago, two_years_ago = now - timedelta(days=365), now - timedelta(days=730)
     me = {a.lower() for a in me}
@@ -135,6 +137,10 @@ def build(maildir, me, now=None):
 
     for path in sorted(Path(maildir, "cur").iterdir()):
         msg = read_headers(path)
+        if since and not ((d := date_of(msg)) and d >= since):
+            continue
+        if delivered_to and delivered_to.lower() not in {a.lower() for _, a in getaddresses(msg.get_all("Delivered-To", []))}:
+            continue
         # Addresses are split out before names are decoded: a decoded name can
         # contain a comma ("Smith, John") that would otherwise split it in two.
         from_ = getaddresses([msg.get("From", "")])
@@ -205,8 +211,11 @@ def main(argv=None):
     parser.add_argument("root", help="the archive root (holding maildir/)")
     parser.add_argument("--me", action="append", default=[], help="an address of the archive's owner; repeat for each")
     parser.add_argument("--output", help="write the CSV here instead of standard output")
+    parser.add_argument("--since", type=date.fromisoformat, help="only count messages dated on or after this day (YYYY-MM-DD)")
+    parser.add_argument("--delivered-to", help="only count messages delivered to this address")
     args = parser.parse_args(argv)
-    rows = build(Path(args.root, "maildir"), args.me)
+    since = datetime.combine(args.since, datetime.min.time(), timezone.utc) if args.since else None
+    rows = build(Path(args.root, "maildir"), args.me, since=since, delivered_to=args.delivered_to)
     out = open(args.output, "w", newline="") if args.output else sys.stdout
     writer = csv.DictWriter(out, fieldnames=COLUMNS)
     writer.writeheader()

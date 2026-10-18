@@ -140,3 +140,13 @@ def test_unsubscribe_link_from_newest_message(maildir):
 
     assert (rows["n@list.example"]["unsubscribe"], rows["n@list.example"]["one_click"]) == ("https://list.example/new", True)
     assert (rows["m@mailto.example"]["unsubscribe"], rows["m@mailto.example"]["one_click"]) == ("mailto:leave@mailto.example", False)
+
+
+def test_since_and_delivered_to_limit_what_is_counted(maildir):
+    add(maildir, 1, "News <news@shop.example>", "Old", days_ago=900, extra="Delivered-To: a@example.com\n")
+    add(maildir, 2, "News <news@shop.example>", "Recent", days_ago=10, extra="Delivered-To: a@example.com\n")
+    add(maildir, 3, "Other <o@shop.example>", "Elsewhere", days_ago=10, extra="Delivered-To: b@example.com\n")
+    since = NOW - timedelta(days=100)
+    rows = by_sender(build(maildir, ["me@example.com"], now=NOW, since=since, delivered_to="A@example.com"))
+    assert set(rows) == {"news@shop.example"}
+    assert rows["news@shop.example"]["messages"] == 1
